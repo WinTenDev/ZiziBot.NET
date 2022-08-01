@@ -15,7 +15,7 @@ public class WebhookController : ControllerBase
 
     [HttpPost]
     [Route("{targetId}")]
-    public async Task<IActionResult> HookWithDebug(
+    public async Task<IActionResult> Run(
         [FromBody] object content,
         string targetId
     )

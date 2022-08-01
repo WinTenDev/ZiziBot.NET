@@ -29,6 +29,7 @@ public static class WebHookGitHubExtension
         {
             {} when githubRoot.Hook != null => $"WebHook berhasil terpasang",
             {} when githubRoot.Commits != null => githubRoot.ParseCommits(),
+            {} when githubRoot.PullRequest != null => githubRoot.ExtractPullRequest(),
             {} when eventName == "star" => githubRoot.StarringRepo(),
             _ => "Event ini belum didukung. Silahkan hubungi developer. EventName: " + eventName,
         };
@@ -63,6 +64,19 @@ public static class WebHookGitHubExtension
         var repository = githubRoot.Repository;
         var htmlMessage = HtmlMessage.Empty
             .Bold("🌟 Starring ").Url(repository.HtmlUrl.ToString(), repository.FullName).Br().Br();
+
+        return htmlMessage.ToString();
+    }
+
+    private static string ExtractPullRequest(this GithubRoot githubRoot)
+    {
+        var repository = githubRoot.Repository;
+        var pullRequest = githubRoot.PullRequest;
+
+        var htmlMessage = HtmlMessage.Empty
+            .Bold($"🔌 Pull Request to ").Url(repository.HtmlUrl.ToString(), repository.FullName).Br().Br()
+            .Bold("Title: ").Url(pullRequest.HtmlUrl.ToString(), pullRequest.Title).Br().Br()
+            .TextBr(pullRequest.Body);
 
         return htmlMessage.ToString();
     }

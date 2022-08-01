@@ -677,7 +677,7 @@ public static class TelegramServiceMemberExtension
 
             var listKeyboard = subscriptionToAll.Select(
                 result => {
-                    return InlineKeyboardButton.WithCallbackData(result.ChannelName, result.ChannelId.ToString());
+                    return InlineKeyboardButton.WithUrl(result.ChannelName, result.InviteLink);
                 }
             );
 

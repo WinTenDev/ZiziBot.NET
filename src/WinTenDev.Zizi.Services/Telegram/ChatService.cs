@@ -221,55 +221,65 @@ public class ChatService
         var linkedChatId = getChat.LinkedChatId ?? 0;
 
         if (getChat.LinkedChatId == null) return subscriptionResult;
-        var chatLinked = await GetChatAsync(linkedChatId, true);
-
-        if (chatLinked.Username == null)
-        {
-            Log.Information(
-                "Force Subs for ChatId: {ChatId} is disabled because linked channel with Id: {LinkedChatId} is not a Public Channel",
-                chatId,
-                linkedChatId
-            );
-
-            return subscriptionResult;
-        }
-
-        subscriptionResult.ChannelId = linkedChatId;
-        subscriptionResult.ChannelName = chatLinked.Title;
-        subscriptionResult.InviteLink = chatLinked.InviteLink;
 
         try
         {
+            var chatLinked = await GetChatAsync(linkedChatId, evictBefore: true);
+
+            if (chatLinked.Username == null)
+            {
+                Log.Information(
+                    "Force Subs for ChatId: {ChatId} is disabled because linked channel with Id: {LinkedChatId} is not a Public Channel",
+                    chatId,
+                    linkedChatId
+                );
+
+                return subscriptionResult;
+            }
+
+            var inviteLink = chatLinked.InviteLink ?? chatLinked.GetChatLink();
+
+            subscriptionResult.ChannelId = linkedChatId;
+            subscriptionResult.ChannelName = chatLinked.Title;
+            subscriptionResult.InviteLink = inviteLink;
+
             var chatMember = await GetChatMemberAsync(
                 chatId: linkedChatId,
                 userId: userId,
-                evictBefore: true,
-                evictAfter: true
+                evictBefore: true
             );
 
             var isSubscribed = chatMember.Status != ChatMemberStatus.Left;
 
             subscriptionResult.IsSubscribed = isSubscribed;
 
-            if (!isSubscribed)
-            {
-                return subscriptionResult;
-            }
-
             return subscriptionResult;
         }
         catch (Exception exception)
         {
-            Log.Error(
-                exception,
-                "Error when check UserId: {UserId} Subscription into Linked ChannelId: {ChatId}",
-                userId,
-                linkedChatId
+            var isMeHere = await IsMeHereAsync(
+                chatId: linkedChatId,
+                evictBefore: true
             );
 
-            if (exception.Contains("user not found"))
+            if (isMeHere)
             {
                 subscriptionResult.IsSubscribed = false;
+
+                _logger.LogDebug("Seem UserId {UserId} is not subscribed into Linked ChannelId: {ChatId}",
+                    userId,
+                    linkedChatId
+                );
+            }
+            else
+            {
+                Log.Error(
+                    exception,
+                    "Error check Subscription for UserId: {UserId} into Linked ChannelId: {ChatId}. Is Bot there? {IsMeHere}",
+                    userId,
+                    linkedChatId,
+                    isMeHere
+                );
             }
 
             return subscriptionResult;
@@ -344,10 +354,18 @@ public class ChatService
         return subscriptionResult;
     }
 
-    public async Task<bool> IsMeHereAsync(long chatId)
+    public async Task<bool> IsMeHereAsync(
+        long chatId,
+        bool evictBefore = false
+    )
     {
         var me = await _botService.GetMeAsync();
-        var chatMember = await GetChatMemberAsync(chatId, me.Id);
+        var chatMember = await GetChatMemberAsync(
+            chatId: chatId,
+            userId: me.Id,
+            evictBefore: evictBefore
+        );
+
         var isHere = chatMember.Status is not (ChatMemberStatus.Left or ChatMemberStatus.Kicked);
 
         return isHere;

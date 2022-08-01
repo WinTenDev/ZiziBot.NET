@@ -56,5 +56,8 @@ namespace WinTenDev.Zizi.Models.Types.Github
 
         [JsonProperty("head_commit")]
         public Commit HeadCommit { get; set; }
+
+        [JsonProperty("pull_request")]
+        public PullRequest PullRequest { get; set; }
     }
 }

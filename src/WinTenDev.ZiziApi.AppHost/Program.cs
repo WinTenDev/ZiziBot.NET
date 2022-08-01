@@ -1,6 +1,5 @@
 using AutoWrapper;
 using Serilog;
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host
@@ -54,6 +53,8 @@ if (app.Environment.IsDevelopment())
 
 // app.UseHttpsRedirection();
 app.UseSerilogRequestLogging();
+
+app.UseRequestTimestamp();
 
 app.UseAuthorization();
 app.RunMongoDbPreparation();

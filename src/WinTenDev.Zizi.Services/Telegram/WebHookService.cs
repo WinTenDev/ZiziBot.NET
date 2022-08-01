@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -28,12 +29,14 @@ public class WebHookService
 
     public async Task<WebHookResult> ProcessingRequest(HttpRequest request)
     {
-        var webHookSource = request.GetWebHookSource();
-        var bodyString = await request.GetRawBodyAsync();
+        var stopwatch = Stopwatch.StartNew();
+        var requestStartedOn = (DateTime)request.HttpContext.Items["RequestStartedOn"]!;
 
-        var requestPath = request.Path.Value;
-        var dateStamp = DateTime.Now.ToString("yyyy-MM-dd/HH-mm-ss");
-        await bodyString.WriteTextAsync($"{requestPath}/{webHookSource}/{dateStamp}.json", Formatting.Indented);
+        var responseTime = DateTime.UtcNow - requestStartedOn;
+
+        var webHookSource = request.GetWebHookSource();
+
+        await RunDebugMode(request);
 
         var result = webHookSource switch
         {
@@ -46,7 +49,7 @@ public class WebHookService
         };
 
         var hookId = request.RouteValues.ElementAtOrDefault(2).Value;
-        var webHookChat = await _webHookChatService.GetWebHookById(hookId.ToString());
+        var webHookChat = await _webHookChatService.GetWebHookById(hookId?.ToString());
 
         if (webHookChat == null)
         {
@@ -77,21 +80,24 @@ public class WebHookService
             sentMessage
         );
 
+        result.ResponseTime = responseTime.ToString();
+        result.ExecutionTime = stopwatch.Elapsed.ToString();
+
         return result;
     }
 
-    private async Task SendMessage(WebHookResult result)
+    private async Task RunDebugMode(HttpRequest request)
     {
-        var chatId = "-1001404591750";
-        var source = result.WebhookSource;
-        var message = result.WebhookSource.ToString();
+        var requestStartedOn = (DateTime)request.HttpContext.Items["RequestStartedOn"]!;
+        var webHookSource = request.GetWebHookSource();
+        var bodyString = await request.GetRawBodyAsync();
 
-        var sentMessage = await _botClient.SendTextMessageAsync(chatId, message);
+        var isDebug = request.Query.FirstOrDefault(pair => pair.Key == "debug").Value.FirstOrDefault().ToBool();
 
-        _logger.LogInformation("Sent WebHook from {Source} to ChatId: {ChatId} Message: {@Message}",
-            source,
-            chatId,
-            sentMessage
-        );
+        if (!isDebug) return;
+
+        var dateStamp = requestStartedOn.ToString("yyyy-MM-dd/HH-mm-ss");
+        var requestPath = request.Path.Value;
+        await bodyString.WriteTextAsync($"{requestPath}/{webHookSource}/{dateStamp}.json", Formatting.Indented);
     }
 }
